@@ -34,17 +34,18 @@ jobs:
     - name: Create Archive (Windows)
       if: matrix.os == 'windows-latest'
       run: |
-        FOR /F "usebackq delims=-. tokens=4-7" %a IN (`rustup show active-toolchain`) DO (
-          SET RUST_TARGET=%a-%b-%c-%d
+        FOR /F "usebackq delims=-. tokens=4-7" %%a IN (`rustup show active-toolchain`) DO (
+          SET RUST_TARGET=%%a-%%b-%%c-%%d
         )
-        FOR /F "usebackq" %a IN (`ECHO %RUST_TARGET%`) DO (
-          SET RUST_TARGET=%a
+        FOR /F "usebackq" %%a IN (`ECHO %RUST_TARGET%`) DO (
+          SET RUST_TARGET=%%a
         )
-        pushd target\release\examples
+        PUSHD target\release\examples
         7zip a -tzip ..\..\..\tftp-%RUST_TARGET%.zip tftp.exe tftpd.exe
-        popd
-        echo "RUST_TARGET=%RUST_TARGET%" >> $GITHUB_ENV
-        echo "ARTIFACT_PATH=tftp-%RUST_TARGET%.zip" >> $GITHUB_ENV
+        POPD
+        ECHO RUST_TARGET=%RUST_TARGET% >> $GITHUB_ENV
+        ECHO ARTIFACT_PATH=tftp-%RUST_TARGET%.zip >> $GITHUB_ENV
+      shell: cmd
     - name: Upload Artifact
       uses: actions/upload-artifact@v3.0.0
       with:
