@@ -34,7 +34,7 @@ jobs:
     - name: Create Archive (Windows)
       if: matrix.os == 'windows-latest'
       run: |
-        Write-Output $(rustup)
+        Write-Output $(rustup show active-toolchain)
         $targets = $(rustup show active-toolchain).Split('.- ')
         $RUST_ARCH=$targets[3]
         $RUST_PLAT=$targets[4]
