@@ -41,10 +41,10 @@ jobs:
           SET RUST_TARGET=%%a
         )
         PUSHD target\release\examples
-        7zip a -tzip ..\..\..\tftp-%RUST_TARGET%.zip tftp.exe tftpd.exe
+        "C:\Program Files\7-Zip\7zip.exe" a -tzip ..\..\..\tftp-%RUST_TARGET%.zip tftp.exe tftpd.exe
         POPD
-        ECHO RUST_TARGET=%RUST_TARGET% >> $GITHUB_ENV
-        ECHO ARTIFACT_PATH=tftp-%RUST_TARGET%.zip >> $GITHUB_ENV
+        ECHO RUST_TARGET=%RUST_TARGET% >> %GITHUB_ENV%
+        ECHO ARTIFACT_PATH=tftp-%RUST_TARGET%.zip >> %GITHUB_ENV%
       shell: cmd
     - name: Upload Artifact
       uses: actions/upload-artifact@v3.0.0
