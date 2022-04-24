@@ -1,8 +1,9 @@
-name: Build
+name: CI
 
 on:
   push:
     branches: [ main ]
+    tags-ignore: [ * ]
 
 env:
   CARGO_TERM_COLOR: always
@@ -47,20 +48,3 @@ jobs:
         name: ${{ env.RUST_TARGET }}
         path: ${{ env.ARTIFACT_PATH }}
         retention-days: 1
-
-  release:
-
-    needs: build
-
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v3
-    - uses: actions/download-artifact@v3.0.0
-      with:
-        path: artifacts
-    - name: Create Release
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: |
-        find ./artifacts -type f
