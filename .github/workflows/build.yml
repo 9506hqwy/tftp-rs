@@ -34,12 +34,12 @@ jobs:
     - name: Create Archive (Windows)
       if: matrix.os == 'windows-latest'
       run: |
-        Write-Output $(rustup show active-toolchain)
-        $targets = $(rustup show active-toolchain).Split('.- ')
-        $RUST_ARCH=$targets[3]
-        $RUST_PLAT=$targets[4]
-        $RUST_OS=$targets[5]
-        $RUST_ENV=$targets[6]
+        $RUST_TOOLCHAIN = $(rustup show active-toolchain).Split('- ')
+        Write-Output $RUST_TOOLCHAIN
+        $RUST_ARCH=$RUST_TOOLCHAIN[1]
+        $RUST_PLAT=$RUST_TOOLCHAIN[2]
+        $RUST_OS=$RUST_TOOLCHAIN[3]
+        $RUST_ENV=$RUST_TOOLCHAIN[4]
         $RUST_TARGET="x86_64-pc-windows-msvc"
         Compress-Archive -Path 'target\release\examples\tftp.exe', 'target\release\examples\tftpd.exe' -DestinationPath tftp-${RUST_TARGET}.zip
         Write-Output "RUST_TARGET=$RUST_TARGET" >> $env:GITHUB_ENV
