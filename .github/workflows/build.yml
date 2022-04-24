@@ -20,3 +20,13 @@ jobs:
       run: cargo test --verbose
     - name: Create Artifacts
       run: cargo build --release --examples --verbose
+    - name: Create Archive
+      run: |
+        RUST_TARGET=`rustup show active-toolchain | sed -e 's/[^-]*-\(.*\)\s.*/\1/'`
+        tar -C ./target/release/examples/ -zcf tftp-${RUST_TARGET}.tar.gz tftp tftpd
+        echo "ARTIFACT_PATH=tftp-${RUST_TARGET}.tar.gz" >> $GITHUB_ENV
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v3.0.0
+      with:
+        name: artifact
+        path: ${{ env.ARTIFACT_PATH }}
