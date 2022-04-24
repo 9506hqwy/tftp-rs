@@ -3,8 +3,6 @@ name: Build
 on:
   push:
     branches: [ main ]
-  pull_request:
-    branches: [ main ]
 
 env:
   CARGO_TERM_COLOR: always
@@ -48,3 +46,18 @@ jobs:
       with:
         name: ${{ env.RUST_TARGET }}
         path: ${{ env.ARTIFACT_PATH }}
+        retention-days: 1
+
+  release:
+
+    needs: build
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/download-artifact@v3.0.0
+    - name: Create Release
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: |
+        ls tftp-*.{tar.gz,zip}
