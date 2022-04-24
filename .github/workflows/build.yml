@@ -12,7 +12,11 @@ env:
 jobs:
   build:
 
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
 
     steps:
     - uses: actions/checkout@v3
@@ -20,13 +24,29 @@ jobs:
       run: cargo test --verbose
     - name: Create Artifacts
       run: cargo build --release --examples --verbose
-    - name: Create Archive
+    - name: Create Archive (Ubuntu)
+      if: matrix.os == 'ubuntu-latest'
       run: |
         RUST_TARGET=`rustup show active-toolchain | sed -e 's/[^-]*-\(.*\)\s.*/\1/'`
         tar -C ./target/release/examples/ -zcf tftp-${RUST_TARGET}.tar.gz tftp tftpd
+        echo "RUST_TARGET=${RUST_TARGET}" >> $GITHUB_ENV
         echo "ARTIFACT_PATH=tftp-${RUST_TARGET}.tar.gz" >> $GITHUB_ENV
+    - name: Create Archive (Windows)
+      if: matrix.os == 'windows-latest'
+      run: |
+        FOR /F "usebackq delims=-. tokens=4-7" %a IN (`rustup show active-toolchain`) DO (
+          SET RUST_TARGET=%a-%b-%c-%d
+        )
+        FOR /F "usebackq" %a IN (`ECHO %RUST_TARGET%`) DO (
+          SET RUST_TARGET=%a
+        )
+        pushd target\release\examples
+        7zip a -tzip ..\..\..\tftp-%RUST_TARGET%.zip tftp.exe tftpd.exe
+        popd
+        echo "RUST_TARGET=%RUST_TARGET%" >> $GITHUB_ENV
+        echo "ARTIFACT_PATH=tftp-%RUST_TARGET%.zip" >> $GITHUB_ENV
     - name: Upload Artifact
       uses: actions/upload-artifact@v3.0.0
       with:
-        name: artifact
+        name: ${{ env.RUST_TARGET }}
         path: ${{ env.ARTIFACT_PATH }}
