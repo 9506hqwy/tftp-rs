@@ -11,10 +11,10 @@ categories = ["network-programming"]
 
 [dependencies]
 bytes = "1.1.0"
-log = "0.4.16"
+log = "0.4.17"
 
 [dependencies.tokio]
-version = "1.17.0"
+version = "1.18.1"
 features = ["fs", "io-util", "macros", "net", "rt-multi-thread", "time"]
 
 [dev-dependencies]
