@@ -81,28 +81,34 @@ async fn handle_request(
 
     match req.op_code() {
         OpCode::Rrq => {
-            let local = filepath.canonicalize()?;
-            if !local.starts_with(root) {
+            let local_file = filepath.canonicalize()?;
+            if !local_file.starts_with(root) {
                 return Err(Error::InvalidFileName);
             }
 
+            let local = file::open_read(&local_file).await?;
+            session.set_reader(local);
+
             let mut options = req.options().clone();
             options.cut_off(&limitations);
-            options.set_tsize(&local);
+            options.set_tsize(&local_file);
             session.set_options(options);
 
             let (_, buf) = if session.options().has_option() {
                 session.send_oack_recv_data().await?
             } else {
-                session.send_data_recv_ack(&local, 0).await?
+                session.send_data_recv_ack(0).await?
             };
 
-            handle_packet(req.op_code(), session, buf, &local).await?;
+            handle_packet(req.op_code(), session, buf).await?;
         }
         OpCode::Wrq => {
             if (!filepath.starts_with(root)) || filepath.iter().any(|i| i == "..") {
                 return Err(Error::InvalidFileName);
             }
+
+            let local = file::open_create(&filepath).await?;
+            session.set_writer(local);
 
             let mut options = req.options().clone();
             options.cut_off(&limitations);
@@ -116,9 +122,7 @@ async fn handle_request(
                 session.send_ack_recv_data().await?
             };
 
-            file::create(&filepath).await?;
-
-            handle_packet(req.op_code(), session, buf, &filepath).await?;
+            handle_packet(req.op_code(), session, buf).await?;
         }
         _ => {
             return Err(Error::InvalidOpCode);

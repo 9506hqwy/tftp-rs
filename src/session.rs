@@ -7,8 +7,10 @@ use bytes::Bytes;
 use log::{trace, warn};
 use std::future::Future;
 use std::net::SocketAddr;
-use std::path::Path;
+use tokio::fs::File;
+use tokio::io::{BufReader, BufWriter};
 use tokio::net::UdpSocket;
+use tokio::sync::Mutex;
 use tokio::time::{self, Duration};
 
 pub struct TftpSession {
@@ -17,10 +19,16 @@ pub struct TftpSession {
     received_data: u16,
     sock: UdpSocket,
     remote_addr: SocketAddr,
+    local_file: Option<TftpSessionFile>,
     mode: String,
     options: Options,
     rollover: u32,
     lastch: Option<u8>,
+}
+
+pub enum TftpSessionFile {
+    Reader(Mutex<BufReader<File>>),
+    Writer(BufWriter<File>),
 }
 
 struct FileBlock {
@@ -39,6 +47,7 @@ impl TftpSession {
             received_data: 0,
             sock,
             remote_addr,
+            local_file: None,
             mode: "netascii".to_string(),
             options: Options::default(),
             rollover: 0,
@@ -94,6 +103,30 @@ impl TftpSession {
         }
     }
 
+    pub fn reader(&self) -> &Mutex<BufReader<File>> {
+        match self.local_file.as_ref() {
+            Some(TftpSessionFile::Reader(reader)) => reader,
+            _ => panic!(),
+        }
+    }
+
+    pub fn set_reader(&mut self, file: File) {
+        let reader = BufReader::new(file);
+        self.local_file = Some(TftpSessionFile::Reader(Mutex::new(reader)));
+    }
+
+    pub fn writer_mut(&mut self) -> &mut BufWriter<File> {
+        match self.local_file.as_mut() {
+            Some(TftpSessionFile::Writer(writer)) => writer,
+            _ => panic!(),
+        }
+    }
+
+    pub fn set_writer(&mut self, file: File) {
+        let writer = BufWriter::new(file);
+        self.local_file = Some(TftpSessionFile::Writer(writer));
+    }
+
     pub fn mode(&self) -> &str {
         &self.mode
     }
@@ -124,6 +157,12 @@ impl TftpSession {
 
     pub fn set_lastch(&mut self, lastch: Option<u8>) {
         self.lastch = lastch;
+    }
+
+    pub async fn write(&mut self, buf: &[u8]) -> Result<(usize, Option<u8>), Error> {
+        let mode = self.mode().to_string();
+        let lastch = self.lastch();
+        file::write(self.writer_mut(), buf, &mode, lastch).await
     }
 
     async fn recv(&self, size: usize) -> Result<Bytes, Error> {
@@ -181,7 +220,6 @@ impl TftpSession {
 
     pub async fn send_data_recv_ack(
         &mut self,
-        filepath: &Path,
         blocknum_start: u16,
     ) -> Result<(usize, Bytes), Error> {
         let blocknum_req = match blocknum_start.checked_add(1) {
@@ -203,7 +241,7 @@ impl TftpSession {
 
         let ((blocks, rollover, lastch), buf) = self
             .wait_for_recv(
-                |c| c.send_multi_data(filepath, blocknum_start, reader_pos, lastch),
+                |c| c.send_multi_data(blocknum_start, reader_pos, lastch),
                 |c| c.recv(c.options().blksize() + HEADER_LEN),
             )
             .await?;
@@ -247,7 +285,6 @@ impl TftpSession {
 
     async fn send_multi_data(
         &self,
-        filepath: &Path,
         blocknum_start: u16,
         reader_pos: u64,
         lastch: Option<u8>,
@@ -269,8 +306,10 @@ impl TftpSession {
             };
 
             let mut data_buf = vec![0u8; self.options().blksize()];
+            let reader_lock = self.reader();
+            let mut reader = reader_lock.lock().await;
             let (reader_pos_len, data_buf_len, ch) = file::read(
-                filepath,
+                &mut reader,
                 data_buf.as_mut_slice(),
                 reader_pos,
                 self.mode(),

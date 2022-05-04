@@ -8,7 +8,7 @@ const NULL: u8 = b'\0';
 const CR: u8 = b'\r';
 const LF: u8 = b'\n';
 
-pub async fn create(path: &Path) -> Result<File, Error> {
+pub async fn open_create(path: &Path) -> Result<File, Error> {
     let file = OpenOptions::new()
         .write(true)
         .create_new(true)
@@ -17,23 +17,25 @@ pub async fn create(path: &Path) -> Result<File, Error> {
     Ok(file)
 }
 
+pub async fn open_read(path: &Path) -> Result<File, Error> {
+    let file = OpenOptions::new().read(true).open(&path).await?;
+    Ok(file)
+}
+
 pub async fn read(
-    path: &Path,
+    reader: &mut BufReader<File>,
     buf: &mut [u8],
     reader_pos: u64,
     mode: &str,
     lastch: Option<u8>,
 ) -> Result<(usize, usize, Option<u8>), Error> {
-    let file = OpenOptions::new().read(true).open(path).await?;
-    let mut reader = BufReader::new(file);
-
     let offset = SeekFrom::Start(reader_pos);
     reader.seek(offset).await?;
 
     let ret = if mode == "octet" {
-        read_octet(&mut reader, lastch, buf).await?
+        read_octet(reader, lastch, buf).await?
     } else {
-        read_netascii(&mut reader, lastch, buf).await?
+        read_netascii(reader, lastch, buf).await?
     };
 
     Ok(ret)
@@ -136,25 +138,18 @@ async fn read_octet(
 }
 
 pub async fn write(
-    path: &Path,
+    writer: &mut BufWriter<File>,
     buf: &[u8],
     mode: &str,
     lastch: Option<u8>,
 ) -> Result<(usize, Option<u8>), Error> {
-    let file = OpenOptions::new()
-        .write(true)
-        .truncate(false)
-        .open(path)
-        .await?;
-    let mut writer = BufWriter::new(file);
-
     let offset = SeekFrom::End(0);
     writer.seek(offset).await?;
 
     let ret = if mode == "octet" {
-        write_octet(&mut writer, lastch, buf).await?
+        write_octet(writer, lastch, buf).await?
     } else {
-        write_netascii(&mut writer, lastch, buf).await?
+        write_netascii(writer, lastch, buf).await?
     };
 
     writer.flush().await?;

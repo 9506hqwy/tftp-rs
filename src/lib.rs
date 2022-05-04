@@ -11,7 +11,6 @@ use self::error::Error;
 use bytes::Bytes;
 use log::{error, trace};
 use std::cmp::Ordering;
-use std::path::Path;
 
 const HEADER_LEN: usize = 4;
 const ROLLOVER: u16 = 0;
@@ -42,7 +41,6 @@ pub enum ErrorCode {
 async fn handle_ack(
     session: &mut session::TftpSession,
     ack: &mut Bytes,
-    filepath: &Path,
 ) -> Result<Option<Bytes>, Error> {
     let blocknum = packet::parse_blocknum(ack)?;
 
@@ -69,16 +67,13 @@ async fn handle_ack(
         }
     }
 
-    let (_, buf) = session
-        .send_data_recv_ack(filepath, session.blocknum_ack())
-        .await?;
+    let (_, buf) = session.send_data_recv_ack(session.blocknum_ack()).await?;
     Ok(Some(buf))
 }
 
 async fn handle_data(
     session: &mut session::TftpSession,
     data: &mut Bytes,
-    filepath: &Path,
 ) -> Result<Option<Bytes>, Error> {
     let blocknum = packet::parse_blocknum(data)?;
 
@@ -104,8 +99,7 @@ async fn handle_data(
                 session.rollover_add(1);
             }
 
-            let (_, lastch) =
-                file::write(filepath, data.as_ref(), session.mode(), session.lastch()).await?;
+            let (_, lastch) = session.write(data.as_ref()).await?;
             session.set_lastch(lastch);
 
             // データの保存が成功したら ACK を更新する。
@@ -156,14 +150,13 @@ async fn handle_oack(
     session: &mut session::TftpSession,
     req_code: &OpCode,
     oack: &mut Bytes,
-    filepath: &Path,
 ) -> Result<Option<Bytes>, Error> {
     // クライアントのみ。
     let options = packet::parse_oack(oack)?;
     session.set_options(options);
 
     let (_, buf) = match req_code {
-        &OpCode::Wrq => session.send_data_recv_ack(filepath, 0).await,
+        &OpCode::Wrq => session.send_data_recv_ack(0).await,
         _ => {
             if session.options().tsize() != 0 {
                 // TODO: check ErrorCode::DiskFull
@@ -180,15 +173,14 @@ async fn handle_packet(
     req_code: &OpCode,
     session: &mut session::TftpSession,
     mut buf: Bytes,
-    filepath: &Path,
 ) -> Result<(), Error> {
     loop {
         let op_code = packet::parse_opcode(&mut buf)?.ok_or(Error::InvalidOpCode)?;
 
         let ret = match op_code {
-            OpCode::Ack => handle_ack(session, &mut buf, filepath).await,
-            OpCode::Data => handle_data(session, &mut buf, filepath).await,
-            OpCode::Oack => handle_oack(session, req_code, &mut buf, filepath).await,
+            OpCode::Ack => handle_ack(session, &mut buf).await,
+            OpCode::Data => handle_data(session, &mut buf).await,
+            OpCode::Oack => handle_oack(session, req_code, &mut buf).await,
             OpCode::Error => handle_error(session, &mut buf),
             _ => return Err(Error::InvalidOpCode),
         }?;
@@ -199,12 +191,7 @@ async fn handle_packet(
         }
     }
 
-    trace!(
-        "[{}] completed: {:?} {:?}",
-        session.remote_addr(),
-        req_code,
-        filepath
-    );
+    trace!("[{}] completed: {:?}", session.remote_addr(), req_code,);
 
     Ok(())
 }

@@ -15,7 +15,7 @@ log = "0.4.17"
 
 [dependencies.tokio]
 version = "1.18.1"
-features = ["fs", "io-util", "macros", "net", "rt-multi-thread", "time"]
+features = ["fs", "io-util", "macros", "net", "rt-multi-thread", "sync", "time"]
 
 [dev-dependencies]
 clap = "*"
