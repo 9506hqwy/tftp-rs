@@ -15,7 +15,7 @@ async fn main() -> Result<(), Error> {
         .arg(
             Arg::new("host")
                 .value_name("HOST")
-                .validator(check_type::<Ipv4Addr>)
+                .value_parser(check_type::<Ipv4Addr>)
                 .required(true)
                 .help("connect server's IP address."),
         )
@@ -25,7 +25,7 @@ async fn main() -> Result<(), Error> {
                 .long("port")
                 .default_value("69")
                 .value_name("PORT")
-                .validator(check_type::<u16>)
+                .value_parser(check_type::<u16>)
                 .help("connect server's port."),
         )
         .arg(
@@ -43,7 +43,7 @@ async fn main() -> Result<(), Error> {
         .arg(
             Arg::new("operation")
                 .value_name("OPERATION")
-                .possible_values(["get", "put"])
+                .value_parser(["get", "put"])
                 .required(true)
                 .help("operation."),
         )
@@ -53,7 +53,7 @@ async fn main() -> Result<(), Error> {
                 .long("mode")
                 .default_value("netascii")
                 .value_name("MODE")
-                .possible_values(["netascii", "octet"])
+                .value_parser(["netascii", "octet"])
                 .help("transfer mode."),
         )
         .arg(
@@ -61,7 +61,7 @@ async fn main() -> Result<(), Error> {
                 .short('b')
                 .long("blksize")
                 .value_name("BLKSIZE")
-                .validator(check_type::<u16>)
+                .value_parser(check_type::<u16>)
                 .help("blksize."),
         )
         .arg(
@@ -69,48 +69,43 @@ async fn main() -> Result<(), Error> {
                 .short('t')
                 .long("timeout")
                 .value_name("TIMEOUT")
-                .validator(check_type::<u8>)
+                .value_parser(check_type::<u8>)
                 .help("timeout."),
         )
-        .arg(
-            Arg::new("tsize")
-                .long("tsize")
-                .takes_value(false)
-                .help("tsize."),
-        )
+        .arg(Arg::new("tsize").long("tsize").num_args(0).help("tsize."))
         .arg(
             Arg::new("windowsize")
                 .short('w')
                 .long("windowsize")
                 .value_name("WINDOWSIZE")
-                .validator(check_type::<u16>)
+                .value_parser(check_type::<u16>)
                 .help("windowsize."),
         )
         .get_matches();
 
-    let address = matches.value_of("host").unwrap();
-    let port = matches.value_of("port").unwrap();
-    let remote = matches.value_of("remote_file").unwrap();
-    let local = matches.value_of("local_file").unwrap();
-    let op = matches.value_of("operation").unwrap();
-    let mode = matches.value_of("mode").unwrap();
+    let address = matches.get_one::<Ipv4Addr>("host").unwrap();
+    let port = matches.get_one::<u16>("port").unwrap();
+    let remote = matches.get_one::<String>("remote_file").unwrap();
+    let local = matches.get_one::<String>("local_file").unwrap();
+    let op = matches.get_one::<String>("operation").unwrap();
+    let mode = matches.get_one::<String>("mode").unwrap();
 
     let mut builder = OptionBuilder::default();
 
-    if let Some(blksize) = matches.value_of("blksize") {
-        builder = builder.blksize(blksize.parse().unwrap());
+    if let Some(blksize) = matches.get_one::<u16>("blksize") {
+        builder = builder.blksize(*blksize);
     }
 
-    if let Some(timeout) = matches.value_of("timeout") {
-        builder = builder.timeout(timeout.parse().unwrap());
+    if let Some(timeout) = matches.get_one::<u8>("timeout") {
+        builder = builder.timeout(*timeout);
     }
 
-    if matches.is_present("tsize") {
+    if matches.get_flag("tsize") {
         builder = builder.tsize();
     }
 
-    if let Some(windowsize) = matches.value_of("windowsize") {
-        builder = builder.windowsize(windowsize.parse().unwrap());
+    if let Some(windowsize) = matches.get_one::<u16>("windowsize") {
+        builder = builder.windowsize(*windowsize);
     }
 
     let client = Client::new(
@@ -119,17 +114,16 @@ async fn main() -> Result<(), Error> {
         builder.build(),
     );
 
-    match op {
+    match op.as_str() {
         "get" => client.get(Path::new(local), remote).await,
         "put" => client.put(Path::new(local), remote).await,
         _ => unimplemented!(),
     }
 }
 
-fn check_type<T>(value: &str) -> Result<(), String>
+fn check_type<T>(value: &str) -> Result<T, String>
 where
     T: FromStr,
 {
-    value.parse::<T>().map_err(|_| value)?;
-    Ok(())
+    Ok(value.parse::<T>().map_err(|_| value)?)
 }

@@ -18,7 +18,7 @@ async fn main() -> Result<(), Error> {
                 .long("bind")
                 .default_value("0.0.0.0")
                 .value_name("IPADDRESS")
-                .validator(check_type::<Ipv4Addr>)
+                .value_parser(check_type::<Ipv4Addr>)
                 .help("bind server's IP address."),
         )
         .arg(
@@ -27,7 +27,7 @@ async fn main() -> Result<(), Error> {
                 .long("port")
                 .default_value("69")
                 .value_name("PORT")
-                .validator(check_type::<u16>)
+                .value_parser(check_type::<u16>)
                 .help("bind server's port."),
         )
         .arg(
@@ -36,7 +36,7 @@ async fn main() -> Result<(), Error> {
                 .long("root")
                 .default_value(".")
                 .value_name("PATH")
-                .validator(check_root)
+                .value_parser(check_root)
                 .help("publish TFTP root directory."),
         )
         .arg(
@@ -44,52 +44,47 @@ async fn main() -> Result<(), Error> {
                 .short('b')
                 .long("blksize")
                 .value_name("BLKSIZE")
-                .validator(check_type::<u16>)
+                .value_parser(check_type::<u16>)
                 .help("blksize."),
         )
         .arg(
             Arg::new("timeout")
                 .short('t')
                 .long("timeout")
-                .takes_value(false)
+                .num_args(0)
                 .help("timeout."),
         )
-        .arg(
-            Arg::new("tsize")
-                .long("tsize")
-                .takes_value(false)
-                .help("tsize."),
-        )
+        .arg(Arg::new("tsize").long("tsize").num_args(0).help("tsize."))
         .arg(
             Arg::new("windowsize")
                 .short('w')
                 .long("windowsize")
                 .value_name("WINDOWSIZE")
-                .validator(check_type::<u16>)
+                .value_parser(check_type::<u16>)
                 .help("windowsize."),
         )
         .get_matches();
 
-    let address = matches.value_of("bind").unwrap();
-    let port = matches.value_of("port").unwrap().parse::<u16>().unwrap();
-    let root = matches.value_of("root").unwrap();
+    let address = matches.get_one::<Ipv4Addr>("bind").unwrap();
+    let port = matches.get_one::<u16>("port").unwrap();
+    let root = matches.get_one::<String>("root").unwrap();
 
     let mut builder = OptionBuilder::default();
 
-    if let Some(blksize) = matches.value_of("blksize") {
-        builder = builder.blksize(blksize.parse().unwrap());
+    if let Some(blksize) = matches.get_one::<u16>("blksize") {
+        builder = builder.blksize(*blksize);
     }
 
-    if matches.is_present("timeout") {
+    if matches.get_flag("timeout") {
         builder = builder.timeout(0);
     }
 
-    if matches.is_present("tsize") {
+    if matches.get_flag("tsize") {
         builder = builder.tsize();
     }
 
-    if let Some(windowsize) = matches.value_of("windowsize") {
-        builder = builder.windowsize(windowsize.parse().unwrap());
+    if let Some(windowsize) = matches.get_one::<u16>("windowsize") {
+        builder = builder.windowsize(*windowsize);
     }
 
     let server = Server::new(
@@ -101,19 +96,18 @@ async fn main() -> Result<(), Error> {
     Ok(())
 }
 
-fn check_root(root: &str) -> Result<(), String> {
+fn check_root(root: &str) -> Result<String, String> {
     let path = Path::new(&root);
     if path.is_dir() {
-        Ok(())
+        Ok(root.to_string())
     } else {
         Err(root.to_string())
     }
 }
 
-fn check_type<T>(value: &str) -> Result<(), String>
+fn check_type<T>(value: &str) -> Result<T, String>
 where
     T: FromStr,
 {
-    value.parse::<T>().map_err(|_| value)?;
-    Ok(())
+    Ok(value.parse::<T>().map_err(|_| value)?)
 }
