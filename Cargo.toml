@@ -18,8 +18,8 @@ version = "1.29.1"
 features = ["fs", "io-util", "macros", "net", "rt-multi-thread", "sync", "time"]
 
 [dev-dependencies]
-clap = "*"
-env_logger = "*"
+clap = "3.1.15"
+env_logger = "0.9.0"
 
 [[example]]
 name = "tftp"
