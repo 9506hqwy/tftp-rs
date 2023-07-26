@@ -11,7 +11,7 @@ categories = ["network-programming"]
 
 [dependencies]
 bytes = "1.1.0"
-log = "0.4.17"
+log = "0.4.19"
 
 [dependencies.tokio]
 version = "1.29.1"
