@@ -3,7 +3,7 @@ name: CI
 on:
   push:
     branches: [ main ]
-    tags-ignore: [ '*' ]
+    tags-ignore: [ '**' ]
 
 env:
   CARGO_TERM_COLOR: always
@@ -19,10 +19,23 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+
     - name: Run tests
       run: cargo test --verbose
+
     - name: Create Artifacts
       run: cargo build --release --examples --verbose
+
+    - name: Check format
+      if: matrix.os == 'ubuntu-latest'
+      run: cargo fmt --all --check
+
+    - name: Check lint
+      if: matrix.os == 'ubuntu-latest'
+      run: |
+        cargo clippy --fix
+        git diff --exit-code --quiet
+
     - name: Create Archive (Ubuntu)
       if: matrix.os == 'ubuntu-latest'
       run: |
@@ -30,6 +43,7 @@ jobs:
         tar -C ./target/release/examples/ -zcf tftp-${RUST_TARGET}.tar.gz tftp tftpd
         echo "RUST_TARGET=${RUST_TARGET}" >> $GITHUB_ENV
         echo "ARTIFACT_PATH=tftp-${RUST_TARGET}.tar.gz" >> $GITHUB_ENV
+
     - name: Create Archive (Windows)
       if: matrix.os == 'windows-latest'
       run: |
@@ -42,6 +56,7 @@ jobs:
         Compress-Archive -Path 'target\release\examples\tftp.exe', 'target\release\examples\tftpd.exe' -DestinationPath "tftp-${RUST_TARGET}.zip"
         Write-Output "RUST_TARGET=$RUST_TARGET" >> $env:GITHUB_ENV
         Write-Output "ARTIFACT_PATH=tftp-${RUST_TARGET}.zip" >> $env:GITHUB_ENV
+
     - name: Upload Artifact
       uses: actions/upload-artifact@v3
       with:

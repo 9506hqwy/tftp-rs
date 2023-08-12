@@ -2,7 +2,7 @@ name: Release
 
 on:
   push:
-    tags: [ '*' ]
+    tags: [ '**' ]
 
 env:
   CARGO_TERM_COLOR: always
@@ -18,8 +18,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+
     - name: Create Artifacts
       run: cargo build --release --examples --verbose
+
     - name: Create Archive (Ubuntu)
       if: matrix.os == 'ubuntu-latest'
       run: |
@@ -27,6 +29,7 @@ jobs:
         tar -C ./target/release/examples/ -zcf tftp-${GITHUB_REF_NAME}-${RUST_TARGET}.tar.gz tftp tftpd
         echo "RUST_TARGET=${RUST_TARGET}" >> $GITHUB_ENV
         echo "ARTIFACT_PATH=tftp-${GITHUB_REF_NAME}-${RUST_TARGET}.tar.gz" >> $GITHUB_ENV
+
     - name: Create Archive (Windows)
       if: matrix.os == 'windows-latest'
       run: |
@@ -39,6 +42,7 @@ jobs:
         Compress-Archive -Path 'target\release\examples\tftp.exe', 'target\release\examples\tftpd.exe' -DestinationPath "tftp-${env:GITHUB_REF_NAME}-${RUST_TARGET}.zip"
         Write-Output "RUST_TARGET=$RUST_TARGET" >> $env:GITHUB_ENV
         Write-Output "ARTIFACT_PATH=tftp-${env:GITHUB_REF_NAME}-${RUST_TARGET}.zip" >> $env:GITHUB_ENV
+
     - name: Upload Artifact
       uses: actions/upload-artifact@v3
       with:
@@ -54,13 +58,14 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+
     - uses: actions/download-artifact@v3
       with:
         path: artifacts
+
     - name: Create Release
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        find ./artifacts -type f
         gh config set prompt disabled
         gh release create ${GITHUB_REF_NAME} ./artifacts/*/*  -t v${GITHUB_REF_NAME} -d
