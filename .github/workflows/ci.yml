@@ -42,8 +42,8 @@ jobs:
       run: |
         rustup component add llvm-tools-preview
 
-        $TARGET_HOST = $(rustup show active-toolchain) -replace '[^-]*-(?<host>.*)\s.*', '${host}'
-        $TEST_BIN = $(cargo test --no-run 2>&1 | grep Executable | cut -d '(' -f 2 | cut -d ')' -f 1)
+        TARGET_HOST=$(rustup show active-toolchain | sed -e 's/[^-]*-\(.*\)\s.*/\1/')
+        TEST_BIN=$(cargo test --no-run 2>&1 | grep Executable | cut -d '(' -f 2 | cut -d ')' -f 1)
 
         $(rustc --print sysroot)/lib/rustlib/${TARGET_HOST}/bin/llvm-profdata merge \
             -sparse default_*.profraw \
