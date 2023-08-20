@@ -20,12 +20,6 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    - name: Run tests
-      run: cargo test --verbose
-
-    - name: Create Artifacts
-      run: cargo build --release --examples --verbose
-
     - name: Check format
       if: matrix.os == 'ubuntu-latest'
       run: cargo fmt --all --check
@@ -35,6 +29,60 @@ jobs:
       run: |
         cargo clippy --fix
         git diff --exit-code --quiet
+
+    - name: Run tests
+      env:
+        RUSTFLAGS: '-C instrument-coverage'
+      run: cargo test --verbose
+
+    - name: Generate coverage report (Ubuntu)
+      if: matrix.os == 'ubuntu-latest'
+      env:
+        RUSTFLAGS: '-C instrument-coverage'
+      run: |
+        rustup component add llvm-tools-preview
+
+        $TARGET_HOST = $(rustup show active-toolchain) -replace '[^-]*-(?<host>.*)\s.*', '${host}'
+        $TEST_BIN = $(cargo test --no-run 2>&1 | grep Executable | cut -d '(' -f 2 | cut -d ')' -f 1)
+
+        $(rustc --print sysroot)/lib/rustlib/${TARGET_HOST}/bin/llvm-profdata merge \
+            -sparse default_*.profraw \
+            -o default.profdata
+
+        $(rustc --print sysroot)/lib/rustlib/${TARGET_HOST}/bin/llvm-cov report \
+            --ignore-filename-regex='library/std/src' \
+            --ignore-filename-regex='cargo/registry/src' \
+            --object=${TEST_BIN} \
+            --instr-profile=default.profdata \
+            > Summary.txt
+
+        cat Summary.txt
+
+    - name: Generate coverage report (Windows)
+      if: matrix.os == 'windows-latest'
+      env:
+        RUSTFLAGS: '-C instrument-coverage'
+      run: |
+        rustup component add llvm-tools-preview
+
+        $TARGET_HOST = $(rustup show active-toolchain) -replace '[^-]*-(?<host>.*)\s.*', '${host}'
+        $TEST_BIN = ($(cargo test --no-run 2>&1) |? { "$_" -like '*Executable*' }) -replace '.*\((?<path>.*)\).*', '${path}'
+
+        & "$(rustc --print sysroot)\lib\rustlib\${TARGET_HOST}\bin\llvm-profdata.exe" merge `
+            -sparse default_*.profraw `
+            -o default.profdata
+
+        & "$(rustc --print sysroot)\lib\rustlib\${TARGET_HOST}\bin\llvm-cov.exe" report `
+            --ignore-filename-regex='library\\std\\src' `
+            --ignore-filename-regex='cargo\\registry\\src' `
+            --object=${TEST_BIN} `
+            --instr-profile=default.profdata `
+            > Summary.txt
+
+        Get-Content .\Summary.txt
+
+    - name: Create Artifacts
+      run: cargo build --release --examples --verbose
 
     - name: Create Archive (Ubuntu)
       if: matrix.os == 'ubuntu-latest'
@@ -47,12 +95,7 @@ jobs:
     - name: Create Archive (Windows)
       if: matrix.os == 'windows-latest'
       run: |
-        $RUST_TOOLCHAIN = $(rustup show active-toolchain) -Split '[ -]'
-        $RUST_ARCH=$RUST_TOOLCHAIN[1]
-        $RUST_PLAT=$RUST_TOOLCHAIN[2]
-        $RUST_OS=$RUST_TOOLCHAIN[3]
-        $RUST_ENV=$RUST_TOOLCHAIN[4]
-        $RUST_TARGET="${RUST_ARCH}-${RUST_PLAT}-${RUST_OS}-${RUST_ENV}"
+        $RUST_TARGET = $(rustup show active-toolchain) -replace '[^-]*-(?<host>.*)\s.*', '${host}'
         Compress-Archive -Path 'target\release\examples\tftp.exe', 'target\release\examples\tftpd.exe' -DestinationPath "tftp-${RUST_TARGET}.zip"
         Write-Output "RUST_TARGET=$RUST_TARGET" >> $env:GITHUB_ENV
         Write-Output "ARTIFACT_PATH=tftp-${RUST_TARGET}.zip" >> $env:GITHUB_ENV
