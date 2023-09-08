@@ -10,8 +10,8 @@ keywords = ["rfc1350", "rfc2347", "rfc2348", "rfc2349", "rfc7440"]
 categories = ["network-programming"]
 
 [dependencies]
-bytes = "1.4.0"
-log = "0.4.19"
+bytes = "1.5.0"
+log = "0.4.20"
 
 [dependencies.tokio]
 version = "1.32.0"
