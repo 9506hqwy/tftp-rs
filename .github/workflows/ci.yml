@@ -18,7 +18,7 @@ jobs:
         os: [ubuntu-latest, windows-latest]
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Check format
       if: matrix.os == 'ubuntu-latest'
@@ -47,8 +47,9 @@ jobs:
         TEST_BIN=$(cargo test --no-run 2>&1 | grep Executable | cut -d '(' -f 2 | cut -d ')' -f 1)
 
         $(rustc --print sysroot)/lib/rustlib/${TARGET_HOST}/bin/llvm-profdata merge \
-            -sparse default_*.profraw \
-            -o default.profdata
+            --sparse \
+            --output=default.profdata \
+            default_*.profraw
 
         $(rustc --print sysroot)/lib/rustlib/${TARGET_HOST}/bin/llvm-cov export \
             --ignore-filename-regex='library/std/src' \
@@ -64,10 +65,7 @@ jobs:
             --ignore-filename-regex='library/std/src' \
             --ignore-filename-regex='cargo/registry/src' \
             --object=${TEST_BIN} \
-            --instr-profile=default.profdata \
-            > Summary.txt
-
-        cat Summary.txt
+            --instr-profile=default.profdata
 
     - name: Generate coverage report (Windows)
       if: matrix.os == 'windows-latest'
@@ -80,9 +78,12 @@ jobs:
         $TARGET_HOST = $(rustup show active-toolchain) -replace '[^-]*-(?<host>.*)\s.*', '${host}'
         $TEST_BIN = ($(cargo test --no-run 2>&1) |? { "$_" -like '*Executable*' }) -replace '.*\((?<path>.*)\).*', '${path}'
 
+        $profiles = @(Get-ChildItem -Path 'default_*.profraw' -Recurse)
+
         & "$(rustc --print sysroot)\lib\rustlib\${TARGET_HOST}\bin\llvm-profdata.exe" merge `
-            -sparse default_*.profraw `
-            -o default.profdata
+            --sparse `
+            --output=default.profdata `
+            @($profiles |% { $_.FullName })
 
         & "$(rustc --print sysroot)\lib\rustlib\${TARGET_HOST}\bin\llvm-cov.exe" export `
             --ignore-filename-regex='library\\std\\src' `
@@ -98,10 +99,7 @@ jobs:
             --ignore-filename-regex='library\\std\\src' `
             --ignore-filename-regex='cargo\\registry\\src' `
             --object=${TEST_BIN} `
-            --instr-profile=default.profdata `
-            > Summary.txt
-
-        Get-Content .\Summary.txt
+            --instr-profile=default.profdata
 
     - name: Report coverage (Ubuntu)
       if: matrix.os == 'ubuntu-latest'
@@ -116,27 +114,64 @@ jobs:
         Get-Content ".\artifacts\SummaryGithub.md" > $env:GITHUB_STEP_SUMMARY
 
     - name: Create Artifacts
-      run: cargo build --release --examples --verbose
+      run: |
+        cargo build --release --workspace --all-features --verbose
+        cargo build --release --workspace --all-features --examples --verbose
 
     - name: Create Archive (Ubuntu)
       if: matrix.os == 'ubuntu-latest'
       run: |
         RUST_TARGET=`rustup show active-toolchain | sed -e 's/[^-]*-\(.*\)\s.*/\1/'`
-        tar -C ./target/release/examples/ -zcf tftp-${RUST_TARGET}.tar.gz tftp tftpd
+
+        CUR_DIR=$(pwd)
+        LIB_DIR='./target/release'
+        if find ${LIB_DIR} -maxdepth 1 -type f \( -name '*.so' -o -name '*.a' \) | grep . --quiet; then
+            pushd "$LIB_DIR"
+            tar -zcf "${CUR_DIR}/artifacts/${RUST_TARGET}.tar.gz" *.so *.a
+            popd
+        fi
+
+        EXAMPLE_DIR='./target/release/examples/'
+        for EXAMPLE in $(find "$EXAMPLE_DIR" -type f -executable)
+        do
+            BASE_NAME=$(basename "${EXAMPLE}")
+            if [[ ! $BASE_NAME =~ -[a-fA-F0-9]{16}$ ]] ; then
+                tar -C "$EXAMPLE_DIR" -zcf "./artifacts/${BASE_NAME}-${RUST_TARGET}.tar.gz" "$BASE_NAME"
+            fi
+        done
+
         echo "RUST_TARGET=${RUST_TARGET}" >> $GITHUB_ENV
-        echo "ARTIFACT_PATH=tftp-${RUST_TARGET}.tar.gz" >> $GITHUB_ENV
 
     - name: Create Archive (Windows)
       if: matrix.os == 'windows-latest'
       run: |
         $RUST_TARGET = $(rustup show active-toolchain) -replace '[^-]*-(?<host>.*)\s.*', '${host}'
-        Compress-Archive -Path 'target\release\examples\tftp.exe', 'target\release\examples\tftpd.exe' -DestinationPath "tftp-${RUST_TARGET}.zip"
+
+        $TARGETS = @(
+          'target\release\*.exe',
+          'target\release\*.dll',
+          'target\release\*.exp',
+          'target\release\*.lib'
+        )
+        $LIBS = @(Get-Item -Path $TARGETS)
+        if ($LIBS.Length -gt 0) {
+            Compress-Archive -Path $LIBS -DestinationPath ".\artifacts\${RUST_TARGET}.zip"
+        }
+
+        Get-Item -Path 'target\release\examples\*.exe' |% {
+            if ($_.Name.Contains('_') -And (Test-Path (Join-Path $_.Directory $_.Name.Replace('_', '-')))) {
+                return
+            }
+
+            $Name = $_.BaseName;
+            Compress-Archive -Path $_ -DestinationPath ".\artifacts\${Name}-${RUST_TARGET}.zip";
+        }
+
         Write-Output "RUST_TARGET=$RUST_TARGET" >> $env:GITHUB_ENV
-        Write-Output "ARTIFACT_PATH=tftp-${RUST_TARGET}.zip" >> $env:GITHUB_ENV
 
     - name: Upload Artifact
       uses: actions/upload-artifact@v3
       with:
         name: ${{ env.RUST_TARGET }}
-        path: ${{ env.ARTIFACT_PATH }}
+        path: artifacts/
         retention-days: 1
