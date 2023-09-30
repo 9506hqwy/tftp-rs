@@ -47,10 +47,12 @@ jobs:
         TEST_BIN=($(cargo test --no-run 2>&1 | grep Executable | cut -d '(' -f 2 | cut -d ')' -f 1))
         OBJECT_ARGS=$(printf '%s\n' ${TEST_BIN[@]} | xargs -i echo --object={})
 
+        profiles=$(find . -name 'default_*.profraw')
+
         $(rustc --print sysroot)/lib/rustlib/${TARGET_HOST}/bin/llvm-profdata merge \
             --sparse \
             --output=default.profdata \
-            default_*.profraw
+            $profiles
 
         $(rustc --print sysroot)/lib/rustlib/${TARGET_HOST}/bin/llvm-cov export \
             --ignore-filename-regex='library/std/src' \
