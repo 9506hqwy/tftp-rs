@@ -18,7 +18,7 @@ version = "1.35.0"
 features = ["fs", "io-util", "macros", "net", "rt-multi-thread", "sync", "time"]
 
 [dev-dependencies]
-clap = "4.4.11"
+clap = "4.4.12"
 env_logger = "0.10.1"
 
 [[example]]
