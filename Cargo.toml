@@ -14,7 +14,7 @@ bytes = "1.10.0"
 log = "0.4.26"
 
 [dependencies.tokio]
-version = "1.43.0"
+version = "1.44.2"
 features = ["fs", "io-util", "macros", "net", "rt-multi-thread", "sync", "time"]
 
 [dev-dependencies]
