@@ -108,11 +108,7 @@ async fn main() -> Result<(), Error> {
         builder = builder.windowsize(*windowsize);
     }
 
-    let client = Client::new(
-        format!("{}:{}", address, port).parse()?,
-        mode,
-        builder.build(),
-    );
+    let client = Client::new(format!("{address}:{port}").parse()?, mode, builder.build());
 
     match op.as_str() {
         "get" => client.get(Path::new(local), remote).await,

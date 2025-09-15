@@ -1,6 +1,6 @@
+use super::OpCode;
 use super::error;
 use super::options::Options;
-use super::OpCode;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 #[derive(Debug)]
@@ -165,7 +165,7 @@ pub fn error(err: error::Error) -> Bytes {
     let mut bytes = BytesMut::new();
     bytes.put_u16(OpCode::Error as u16);
     bytes.put_u16(err.error_code() as u16);
-    bytes.put(format!("{:?}", err).as_bytes());
+    bytes.put(format!("{err:?}").as_bytes());
     bytes.put_u8(0);
     bytes.freeze()
 }

@@ -3,7 +3,7 @@ use super::file;
 use super::options::Options;
 use super::packet;
 use super::session;
-use super::{handle_packet, OpCode};
+use super::{OpCode, handle_packet};
 use bytes::Bytes;
 use log::{error, trace};
 use std::net::SocketAddr;
@@ -42,7 +42,7 @@ impl Server {
                 match UdpSocket::bind((self.service_addr.ip(), 0)).await {
                     Ok(sock) => {
                         if let Err(e) = sock.connect(remote_addr).await {
-                            eprint!("[{}] {:?}", remote_addr, e);
+                            eprint!("[{remote_addr}] {e:?}");
                             return;
                         }
 

@@ -12,6 +12,13 @@
         "label=disable",
         "seccomp=unconfined"
     ],
+    // Use 'onCreateCommand' to run commands after the container is created.
+    "onCreateCommand": "/bin/bash ${containerWorkspaceFolder}/.devcontainer/on-create.sh",
+    // Set session environment variables.
+    "remoteEnv": {
+        "CARGO_PROFILE_RELEASE_DEBUG": "true",
+        "MEMORY_PROFILER_LOG": "debug"
+    },
     // Uncomment to connect as root instead.
     //"remoteUser": "root",
     // Use default container `USER`,

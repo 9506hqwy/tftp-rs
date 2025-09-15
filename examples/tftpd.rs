@@ -88,7 +88,7 @@ async fn main() -> Result<(), Error> {
     }
 
     let server = Server::new(
-        format!("{0}:{1}", address, port).parse()?,
+        format!("{address}:{port}").parse()?,
         Path::new(root),
         builder.build(),
     )?;

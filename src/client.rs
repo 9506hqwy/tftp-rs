@@ -1,10 +1,10 @@
+use super::OpCode;
 use super::error::Error;
 use super::file;
 use super::handle_packet;
 use super::options::Options;
 use super::packet;
 use super::session;
-use super::OpCode;
 use std::net::SocketAddr;
 use std::path::Path;
 use tokio::fs::File;
