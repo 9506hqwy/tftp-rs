@@ -29,7 +29,7 @@ impl Server {
     pub async fn serve_forever(self) -> Result<(), Error> {
         let service_sock = UdpSocket::bind(self.service_addr).await?;
 
-        trace!("serving: {:?}", &self);
+        trace!("serving: {:?}", self);
 
         loop {
             let mut buf = vec![0; 1024];
@@ -74,7 +74,7 @@ async fn handle_request(
     let req = packet::parse_request(&mut buf)?;
     session.set_mode(req.mode());
 
-    trace!("requested: {:?}", &req);
+    trace!("requested: {:?}", req);
 
     let mut filepath = PathBuf::from(root);
     filepath.push(req.filename());
